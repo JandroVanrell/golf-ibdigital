@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Golf FBD</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;500;700;800&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+:root{
+  --bg:#EDF2EC; --surface:#FFFFFF; --surface2:#F4F8F3; --ink:#13271B; --muted:#58705F; --line:#D2DDD3;
+  --green:#1E5C3E; --green-ink:#FFFFFF; --flag:#CF3B2B; --birdie:#2A6DB5; --heat:#E4572E;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1610; --surface:#15221A; --surface2:#1B2B21; --ink:#E6F0E8; --muted:#97AC9D; --line:#27392D;
+    --green:#5DB88A; --green-ink:#08150E; --flag:#F0705F; --birdie:#6FB1F0; --heat:#E4572E;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1610; --surface:#15221A; --surface2:#1B2B21; --ink:#E6F0E8; --muted:#97AC9D; --line:#27392D;
+  --green:#5DB88A; --green-ink:#08150E; --flag:#F0705F; --birdie:#6FB1F0; --heat:#E4572E;
+  color-scheme:dark;
+}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 70px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.45}
+h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.01em}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2.5px solid var(--green);outline-offset:2px}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:var(--bg);border-bottom:1px solid var(--line)}
+.top-in{max-width:980px;margin:0 auto;padding:12px 16px 0}
+.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.brand h1{font-size:26px;font-weight:800}
+.brand .sub{color:var(--muted);font-size:14px}
+nav{display:flex;gap:4px;overflow-x:auto;margin-top:8px;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{background:none;border:0;border-bottom:3px solid transparent;padding:10px 14px;font-weight:500;color:var(--muted);white-space:nowrap}
+nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--green);font-weight:700}
+
+main{max-width:980px;margin:0 auto;padding:16px 16px 48px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+.card h2{font-size:20px;margin-bottom:4px}
+.card h3{font-size:16px;margin-bottom:8px}
+.muted{color:var(--muted);font-size:14px}
+.note{background:var(--surface2);border:1px solid var(--line);border-left:4px solid var(--birdie);border-radius:8px;padding:10px 12px;margin-bottom:16px;font-size:14px}
+.empty{color:var(--muted);text-align:center;padding:36px 12px}
+.scroll{overflow-x:auto;max-width:100%}
+
+.head-row{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.date{display:flex;flex-direction:column;font-size:13px;color:var(--muted);gap:2px}
+input[type=date],input[type=text]{font:inherit;color:var(--ink);background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.label{font-size:13px;color:var(--muted);margin-bottom:6px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface2);font-weight:500}
+.chip i{width:12px;height:12px;border-radius:50%;background:var(--pc);opacity:.35}
+.chip.on{border-color:var(--pc);background:var(--surface);font-weight:700}
+.chip.on i{opacity:1}
+.addp{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.addp input{flex:1;min-width:140px}
+.btn{background:var(--green);color:var(--green-ink);border:0;border-radius:10px;padding:12px 20px;font-weight:700}
+.btn:disabled{opacity:.5;cursor:default}
+.ghost{background:transparent;border:1.5px solid var(--line);border-radius:10px;padding:10px 16px;font-weight:500}
+.ghost.danger{color:var(--flag);border-color:var(--flag)}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+
+/* Notación de tarjeta: círculo = birdie, cuadrado = bogey, doble cuadrado = doble bogey */
+.sc{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;font-weight:700;font-variant-numeric:tabular-nums;position:relative}
+.sc.s2,.sc.s1{border-radius:50%;box-shadow:inset 0 0 0 2px var(--birdie)}
+.sc.s1{outline:2px solid var(--birdie);outline-offset:2px}
+.sc.s4{border-radius:4px;box-shadow:inset 0 0 0 2px var(--ink)}
+.sc.s5{border-radius:4px;box-shadow:inset 0 0 0 2px var(--flag);outline:2px solid var(--flag);outline-offset:2px}
+.sc.s6{border-radius:4px;background:var(--flag);color:#fff}
+.sc input{width:100%;height:100%;border:0;background:transparent;text-align:center;font:inherit;color:inherit;padding:0;border-radius:inherit}
+.sc.s6 input{color:#fff}
+.sc input:focus-visible{outline:2.5px solid var(--green);outline-offset:3px}
+.sc.sm{width:30px;height:30px;font-size:14px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--muted);margin-top:12px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+
+.holes{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;margin-bottom:14px}
+.hc{height:40px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface2);font-weight:600}
+.hc.done{background:var(--surface);border-color:var(--green)}
+.hc.cur{background:var(--green);color:var(--green-ink);border-color:var(--green)}
+.prow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.pn{display:flex;align-items:center;gap:8px;font-weight:700;font-size:17px}
+.pn i{width:12px;height:12px;border-radius:50%;background:var(--pc)}
+.step{display:flex;align-items:center;gap:14px}
+.step button{width:52px;height:52px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface2);font-size:26px;line-height:1;font-weight:500}
+.step button:active{background:var(--green);color:var(--green-ink)}
+.sv{min-width:48px;display:flex;justify-content:center;font-size:22px}
+.sv .sc{width:46px;height:46px;font-size:22px}
+.sv .dash{color:var(--muted)}
+.nav{display:flex;justify-content:space-between;gap:10px;margin-top:10px}
+
+table{border-collapse:collapse;width:100%}
+th,td{padding:8px 8px;text-align:center;white-space:nowrap}
+th{font-size:13px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--line)}
+td{border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--surface)}
+.pname{font-weight:700}
+.pname i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--pc);margin-right:8px}
+.tot{font-weight:800}
+.sp{color:var(--muted);font-size:14px}
+.pos{color:var(--flag)}
+.neg{color:var(--green)}
+.win{background:var(--green);color:var(--green-ink);font-size:12px;font-weight:700;border-radius:999px;padding:2px 8px;margin-left:8px}
+.heat td:not(:first-child){font-weight:600;min-width:44px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-top:5px solid var(--pc);border-radius:14px;padding:14px}
+.kpi .nm{font-weight:700;font-size:17px}
+.kpi .big{font-size:40px;font-weight:800;line-height:1.05;margin:6px 0 2px;font-variant-numeric:tabular-nums}
+.kpi dl{display:grid;grid-template-columns:1fr auto;gap:2px 10px;margin:8px 0 0;font-size:14px}
+.kpi dt{color:var(--muted)}
+.kpi dd{margin:0;font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+
+.chart-box{position:relative;height:300px}
+.grid2{display:grid;grid-template-columns:1fr;gap:16px}
+@media(min-width:820px){.grid2{grid-template-columns:1fr 1fr}}
+
+.round-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.round-head h3{margin:0}
+
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:10px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50;max-width:90vw;text-align:center}
+#toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in">
+  <div class="brand"><h1>Golf FBD</h1><span class="sub" id="sub"></span></div>
+  <nav id="tabs" role="tablist">
+    <button role="tab" data-v="new" aria-selected="true">Nueva partida</button>
+    <button role="tab" data-v="stats" aria-selected="false">Estadísticas</button>
+    <button role="tab" data-v="evo" aria-selected="false">Evolución</button>
+    <button role="tab" data-v="hist" aria-selected="false">Historial</button>
+  </nav>
+</div></header>
+<main>
+  <div id="banner"></div>
+  <section id="v-new"></section>
+  <section id="v-stats" hidden></section>
+  <section id="v-evo" hidden></section>
+  <section id="v-hist" hidden></section>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ============ CONFIGURACIÓN: pega aquí los datos de tu proyecto de Supabase ============ */
+const SUPABASE_URL = 'https://TU-PROYECTO.supabase.co';
+const SUPABASE_KEY = 'TU-CLAVE-ANON-PUBLICA';
+/* ======================================================================================== */
+(function(){
+'use strict';
+const HOLES=9, PAR=3, PAR_TOTAL=HOLES*PAR, MAXS=15;
+const PCOL=['#2E86DE','#F0932B','#8E6BD8','#2BAE66','#E0517A','#14A3A8'];
+const DRAFT_KEY='golf_fbd_draft_v1', CODE_KEY='golf_fbd_code_v1';
+
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sum=a=>a.reduce((x,y)=>x+y,0);
+const mean=a=>a.length?sum(a)/a.length:0;
+const f1=n=>(Math.round(n*10)/10).toFixed(1).replace('.',',');
+const sgn=n=>n>0?'+'+n:String(n);
+const cls=v=>v==null?'':v<=1?'s1':v===2?'s2':v===3?'s3':v===4?'s4':v===5?'s5':'s6';
+const complete=e=>Array.isArray(e.h)&&e.h.length===HOLES&&e.h.every(Number.isFinite);
+
+let rounds=[];            // {id,n,date,entries:[{p,h:[9]}]}
+let canWrite=true, store=null, sb=null;
+let view='new', charts=[], extraPlayers=[];
+let draft=null, formRendered=false;
+const colorIdx=new Map();
+const pc=name=>{ if(!colorIdx.has(name)) colorIdx.set(name,colorIdx.size); return PCOL[colorIdx.get(name)%PCOL.length]; };
+
+function knownPlayers(){
+  const seen=[];
+  rounds.forEach(r=>r.entries.forEach(e=>{ if(!seen.includes(e.p)) seen.push(e.p); }));
+  extraPlayers.forEach(p=>{ if(!seen.includes(p)) seen.push(p); });
+  seen.forEach(pc);
+  return seen;
+}
+function todayISO(){ try{ return new Date().toLocaleDateString('sv-SE'); }catch(e){ return ''; } }
+function fmtDate(d){ if(!d) return ''; const [y,m,dd]=d.split('-'); return dd+'/'+m+'/'+y; }
+function shortDate(d){ return d? d.slice(8)+'/'+d.slice(5,7) : ''; }
+function roundLabel(r){ return 'P'+r.n+(r.date?' · '+shortDate(r.date):''); }
+
+function newDraft(){
+  return {editId:null,n:null,date:todayISO(),hole:0,
+    players:knownPlayers().map(p=>({name:p,on:true,h:Array(HOLES).fill(null)}))};
+}
+function saveDraft(){ try{ localStorage.setItem(DRAFT_KEY,JSON.stringify(draft)); }catch(e){} }
+function loadDraft(){
+  try{
+    const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');
+    if(d&&Array.isArray(d.players)&&!d.editId) return d;
+  }catch(e){}
+  return null;
+}
+
+/* ---------- Estadísticas ---------- */
+function computeStats(){
+  const names=knownPlayers();
+  const S={};
+  names.forEach(p=>S[p]={name:p,rounds:[],totals:[],holes:Array.from({length:HOLES},()=>[]),cat:{b:0,p:0,bo:0,d:0,x:0},wins:0});
+  const valid=[];
+  rounds.forEach(r=>{
+    const v=r.entries.filter(complete);
+    if(!v.length) return;
+    valid.push(r);
+    const min=Math.min(...v.map(e=>sum(e.h)));
+    v.forEach(e=>{
+      const s=S[e.p], t=sum(e.h);
+      s.rounds.push({n:r.n,t});
+      s.totals.push(t);
+      e.h.forEach((x,i)=>{
+        s.holes[i].push(x);
+        if(x<=2)s.cat.b++; else if(x===3)s.cat.p++; else if(x===4)s.cat.bo++; else if(x===5)s.cat.d++; else s.cat.x++;
+      });
+      if(v.length>1&&t===min) s.wins++;
+    });
+  });
+  const list=names.map(p=>S[p]).filter(s=>s.totals.length).map(s=>{
+    const avg=mean(s.totals), last=s.totals.slice(-5);
+    return Object.assign(s,{played:s.totals.length,avg,best:Math.min(...s.totals),worst:Math.max(...s.totals),
+      hcp:avg-PAR_TOTAL,last5:mean(last),holeAvg:s.holes.map(mean),holeBest:s.holes.map(h=>Math.min(...h)),
+      color:pc(s.name)});
+  });
+  return {list,valid};
+}
+
+/* ---------- Vistas ---------- */
+function show(v){
+  view=v;
+  $$('#tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.v===v)));
+  ['new','stats','evo','hist'].forEach(k=>{ $('#v-'+k).hidden=(k!==v); });
+  renderView();
+  window.scrollTo({top:0});
+}
+function renderView(){
+  destroyCharts();
+  updateSub();
+  if(view==='new') renderNew();
+  else if(view==='stats') renderStats();
+  else if(view==='evo') renderEvo();
+  else renderHist();
+}
+function updateSub(){
+  const n=rounds.length;
+  $('#sub').textContent=n? n+(n===1?' partida':' partidas')+' · 9 hoyos · par '+PAR_TOTAL : '9 hoyos · par '+PAR_TOTAL;
+}
+function renderBanner(){
+  $('#banner').innerHTML='';
+}
+function toast(msg){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2600);
+}
+
+/* ---------- Nueva partida ---------- */
+function noteLegend(){
+  return `<div class="legend">
+    <span><span class="sc sm s2">2</span>Birdie</span>
+    <span><span class="sc sm s3">3</span>Par</span>
+    <span><span class="sc sm s4">4</span>Bogey</span>
+    <span><span class="sc sm s5">5</span>Doble bogey</span>
+    <span><span class="sc sm s6">6</span>6 o más</span>
+  </div>`;
+}
+function doneHole(h){
+  const act=draft.players.filter(p=>p.on);
+  return act.length>0&&act.every(p=>p.h[h]!=null);
+}
+function renderNew(){
+  formRendered=true;
+  const v=$('#v-new');
+  const act=draft.players.map((p,i)=>({p,i})).filter(x=>x.p.on);
+  let html=`
+  <div class="card">
+    <div class="head-row">
+      <div><h2>${draft.editId?'Editando partida '+draft.n:'Nueva partida'}</h2>
+      <div class="muted">Anota los golpes de cada jugador, hoyo a hoyo o directamente en la tarjeta.</div></div>
+      <label class="date">Fecha<input type="date" id="f-date" value="${esc(draft.date||'')}"></label>
+    </div>
+    <div class="label">Quién juega</div>
+    <div class="chips">${draft.players.map((p,i)=>`<button type="button" class="chip ${p.on?'on':''}" style="--pc:${pc(p.name)}" data-act="toggle" data-i="${i}"><i></i>${esc(p.name)}</button>`).join('')}</div>
+    <div class="addp"><input type="text" id="newp" maxlength="20" placeholder="Añadir jugador nuevo" autocomplete="off"><button type="button" class="ghost" data-act="addp">Añadir</button></div>
+  </div>`;
+  if(!act.length){
+    html+='<div class="card empty">Añade o activa al menos un jugador para empezar a anotar.</div>';
+  }else{
+    html+=`
+    <div class="card">
+      <div class="holes">${Array.from({length:HOLES},(_,h)=>`<button type="button" class="hc ${h===draft.hole?'cur':''} ${doneHole(h)?'done':''}" data-act="hole" data-h="${h}" aria-label="Hoyo ${h+1}">${h+1}</button>`).join('')}</div>
+      <h3 id="hole-title">Hoyo ${draft.hole+1}</h3>
+      ${act.map(({p,i})=>`
+      <div class="prow">
+        <span class="pn" style="--pc:${pc(p.name)}"><i></i>${esc(p.name)}</span>
+        <div class="step">
+          <button type="button" data-act="dec" data-i="${i}" aria-label="Quitar golpe a ${esc(p.name)}">−</button>
+          <span class="sv" data-sv="${i}"></span>
+          <button type="button" data-act="inc" data-i="${i}" aria-label="Añadir golpe a ${esc(p.name)}">+</button>
+        </div>
+      </div>`).join('')}
+      <div class="nav">
+        <button type="button" class="ghost" data-act="prevh">← Hoyo anterior</button>
+        <button type="button" class="ghost" data-act="nexth">Hoyo siguiente →</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Tarjeta</h3>
+      <div class="scroll"><table>
+        <thead><tr><th>Jugador</th>${Array.from({length:HOLES},(_,h)=>`<th>${h+1}</th>`).join('')}<th>Total</th><th>+/−</th></tr></thead>
+        <tbody>${act.map(({p,i})=>`
+          <tr><td class="pname" style="--pc:${pc(p.name)}"><i></i>${esc(p.name)}</td>
+          ${Array.from({length:HOLES},(_,h)=>`<td><span class="sc" data-c="${i}-${h}"><input type="text" inputmode="numeric" maxlength="2" data-i="${i}" data-h="${h}" aria-label="${esc(p.name)} hoyo ${h+1}"></span></td>`).join('')}
+          <td class="tot" data-tot="${i}"></td><td class="sp" data-sp="${i}"></td></tr>`).join('')}
+        </tbody></table></div>
+      ${noteLegend()}
+    </div>`;
+  }
+  html+=`<div class="actions">
+    <button type="button" class="btn" id="btn-save" data-act="save" ${canWrite?'':'disabled'}>${draft.editId?'Guardar cambios':'Guardar partida'}</button>
+    <button type="button" class="ghost" data-act="discard">${draft.editId?'Cancelar edición':'Vaciar tarjeta'}</button>
+  </div>`;
+  v.innerHTML=html;
+  refreshForm();
+}
+function refreshForm(){
+  const act=draft.players.map((p,i)=>({p,i})).filter(x=>x.p.on);
+  act.forEach(({p,i})=>{
+    p.h.forEach((val,h)=>{
+      const w=$(`[data-c="${i}-${h}"]`); if(!w) return;
+      w.className='sc '+cls(val);
+      const inp=w.firstElementChild;
+      if(document.activeElement!==inp) inp.value=val==null?'':val;
+    });
+    const filled=p.h.filter(x=>x!=null);
+    const tot=$(`[data-tot="${i}"]`), spc=$(`[data-sp="${i}"]`);
+    if(tot) tot.textContent=filled.length?sum(filled):'–';
+    if(spc){
+      if(filled.length===HOLES){ const d=sum(filled)-PAR_TOTAL; spc.textContent=sgn(d); }
+      else spc.textContent=filled.length?filled.length+'/'+HOLES:'';
+    }
+    const sv=$(`[data-sv="${i}"]`);
+    if(sv){
+      const x=p.h[draft.hole];
+      sv.innerHTML=x==null?'<span class="dash">–</span>':`<span class="sc ${cls(x)}">${x}</span>`;
+    }
+  });
+  $$('.hc').forEach(b=>{
+    const h=+b.dataset.h;
+    b.classList.toggle('cur',h===draft.hole);
+    b.classList.toggle('done',doneHole(h));
+  });
+  const t=$('#hole-title'); if(t) t.textContent='Hoyo '+(draft.hole+1);
+}
+function setScore(i,h,val){
+  draft.players[i].h[h]=val;
+  saveDraft(); refreshForm();
+}
+
+async function saveRound(){
+  if(!canWrite){ toast('No tienes permiso para guardar'); return; }
+  const entries=[];
+  for(const p of draft.players.filter(p=>p.on)){
+    const filled=p.h.filter(x=>x!=null).length;
+    if(filled===0) continue;
+    if(filled<HOLES){ toast('Faltan '+(HOLES-filled)+' hoyos de '+p.name); return; }
+    entries.push({p:p.name,h:p.h.slice()});
+  }
+  if(!entries.length){ toast('Anota los golpes de al menos un jugador'); return; }
+  const n=draft.editId?draft.n:(Math.max(0,...rounds.map(r=>r.n))+1);
+  const id=draft.editId||null;
+  const btn=$('#btn-save'); if(btn) btn.disabled=true;
+  try{
+    await store.save(id,{n,date:draft.date||'',entries});
+    draft=newDraft(); saveDraft();
+    toast('Partida guardada');
+    show('stats');
+  }catch(e){
+    if(!(e&&/clave/i.test(e.message||''))) toast('No se pudo guardar la partida. Inténtalo de nuevo.');
+    if(btn) btn.disabled=false;
+  }
+}
+
+/* ---------- Estadísticas ---------- */
+function heatStyle(avg){
+  if(avg<3.5) return `background:color-mix(in srgb,var(--birdie) ${Math.round((3.5-avg)/1.5*40+10)}%,transparent)`;
+  const k=Math.min(1,Math.max(0,(avg-3.5)/3));
+  return `background:color-mix(in srgb,var(--heat) ${Math.round(k*65)}%,transparent)`;
+}
+function renderStats(){
+  const v=$('#v-stats');
+  const {list}=computeStats();
+  if(!list.length){ v.innerHTML='<div class="card empty">Aún no hay partidas completas. Anota la primera en «Nueva partida».</div>'; return; }
+  const ord=list.slice().sort((a,b)=>a.avg-b.avg);
+  v.innerHTML=`
+  <div class="kpis">${ord.map(s=>`
+    <div class="kpi" style="--pc:${s.color}">
+      <div class="nm">${esc(s.name)}</div>
+      <div class="big">${f1(s.avg)}</div>
+      <div class="muted">golpes de media por partida</div>
+      <dl>
+        <dt>Hándicap</dt><dd>${f1(s.hcp)}</dd>
+        <dt>Mejor / peor</dt><dd>${s.best} / ${s.worst}</dd>
+        <dt>Victorias</dt><dd>${s.wins} de ${s.played}</dd>
+        <dt>Últimas 5</dt><dd>${f1(s.last5)} <span class="${s.last5<=s.avg?'neg':'pos'}">${s.last5<=s.avg?'▼':'▲'}</span></dd>
+      </dl>
+    </div>`).join('')}
+  </div>
+  <div class="card">
+    <h2>Resumen por jugador</h2>
+    <div class="muted" style="margin-bottom:10px">Hándicap = media de golpes − par ${PAR_TOTAL}. Ordenado de mejor a peor media.</div>
+    <div class="scroll"><table>
+      <thead><tr><th>Jugador</th><th>Partidas</th><th>Media</th><th>Mejor</th><th>Peor</th><th>Hándicap</th><th>Victorias</th><th>Birdies</th><th>Pares</th><th>Bogeys</th><th>Dobles</th><th>6+</th></tr></thead>
+      <tbody>${ord.map(s=>`<tr>
+        <td class="pname" style="--pc:${s.color}"><i></i>${esc(s.name)}</td>
+        <td>${s.played}</td><td class="tot">${f1(s.avg)}</td><td>${s.best}</td><td>${s.worst}</td>
+        <td>${f1(s.hcp)}</td><td>${s.wins}</td><td>${s.cat.b}</td><td>${s.cat.p}</td><td>${s.cat.bo}</td><td>${s.cat.d}</td><td>${s.cat.x}</td></tr>`).join('')}
+      </tbody></table></div>
+  </div>
+  <div class="card">
+    <h2>Media de golpes por hoyo</h2>
+    <div class="muted" style="margin-bottom:10px">Azul: por debajo del bogey. Cuanto más rojo, más golpes se pierden en ese hoyo.</div>
+    <div class="scroll"><table class="heat">
+      <thead><tr><th>Jugador</th>${Array.from({length:HOLES},(_,h)=>`<th>${h+1}</th>`).join('')}</tr></thead>
+      <tbody>${ord.map(s=>`<tr><td class="pname" style="--pc:${s.color}"><i></i>${esc(s.name)}</td>
+        ${s.holeAvg.map(a=>`<td style="${heatStyle(a)}">${f1(a)}</td>`).join('')}</tr>`).join('')}
+        <tr><td class="pname">Grupo</td>${Array.from({length:HOLES},(_,h)=>{const a=mean(ord.map(s=>s.holeAvg[h]));return `<td style="${heatStyle(a)}"><b>${f1(a)}</b></td>`;}).join('')}</tr>
+      </tbody></table></div>
+  </div>
+  <div class="card">
+    <h2>Mejor resultado por hoyo</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Jugador</th>${Array.from({length:HOLES},(_,h)=>`<th>${h+1}</th>`).join('')}</tr></thead>
+      <tbody>${ord.map(s=>`<tr><td class="pname" style="--pc:${s.color}"><i></i>${esc(s.name)}</td>
+        ${s.holeBest.map(b=>`<td><span class="sc sm ${cls(b)}">${b}</span></td>`).join('')}</tr>`).join('')}
+      </tbody></table></div>
+    ${noteLegend()}
+  </div>`;
+}
+
+/* ---------- Evolución ---------- */
+function destroyCharts(){ charts.forEach(c=>{try{c.destroy();}catch(e){}}); charts=[]; }
+function themeColors(){
+  const cs=getComputedStyle(document.documentElement), g=k=>cs.getPropertyValue(k).trim();
+  return {ink:g('--ink'),muted:g('--muted'),line:g('--line'),flag:g('--flag'),birdie:g('--birdie'),green:g('--green')};
+}
+function mk(id,cfg){
+  const c=document.getElementById(id); if(!c) return;
+  charts.push(new Chart(c,cfg));
+}
+function renderEvo(){
+  const v=$('#v-evo');
+  const {list,valid}=computeStats();
+  if(!list.length){ v.innerHTML='<div class="card empty">Cuando haya partidas completas verás aquí la evolución de cada jugador.</div>'; return; }
+  if(typeof Chart==='undefined'){ v.innerHTML='<div class="card empty">No se pudieron cargar las gráficas. Comprueba tu conexión y recarga.</div>'; return; }
+  v.innerHTML=`
+  <div class="card"><h2>Golpes por partida</h2><div class="muted" style="margin-bottom:8px">Menos es mejor. Pulsa un nombre de la leyenda para ocultarlo.</div><div class="chart-box"><canvas id="c-tot"></canvas></div></div>
+  <div class="card"><h2>Hándicap acumulado</h2><div class="muted" style="margin-bottom:8px">Media de golpes hasta cada partida menos el par ${PAR_TOTAL}.</div><div class="chart-box"><canvas id="c-hcp"></canvas></div></div>
+  <div class="grid2">
+    <div class="card"><h2>Media por hoyo</h2><div class="chart-box"><canvas id="c-hole"></canvas></div></div>
+    <div class="card"><h2>Victorias</h2><div class="chart-box"><canvas id="c-win"></canvas></div></div>
+  </div>
+  <div class="card"><h2>Tipo de resultado por jugador</h2><div class="muted" style="margin-bottom:8px">Porcentaje de hoyos en cada categoría.</div><div class="chart-box"><canvas id="c-dist"></canvas></div></div>`;
+
+  const T=themeColors();
+  Chart.defaults.color=T.muted; Chart.defaults.borderColor=T.line;
+  Chart.defaults.font.family='"Bricolage Grotesque",system-ui,sans-serif';
+  const base={responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{usePointStyle:true,boxWidth:8}}}};
+
+  const labels=valid.map(roundLabel);
+  const byName=Object.fromEntries(list.map(s=>[s.name,s]));
+  const totalsSeries=list.map(s=>{
+    const data=valid.map(r=>{ const e=r.entries.find(x=>x.p===s.name&&complete(x)); return e?sum(e.h):null; });
+    return {name:s.name,color:s.color,data};
+  });
+  mk('c-tot',{type:'line',data:{labels,datasets:totalsSeries.map(s=>({label:s.name,data:s.data,borderColor:s.color,backgroundColor:s.color,tension:.25,spanGaps:true,pointRadius:4,borderWidth:2.5}))},
+    options:Object.assign({},base,{scales:{y:{title:{display:true,text:'Golpes'},suggestedMin:30},x:{ticks:{maxRotation:60,autoSkip:true}}}})});
+
+  mk('c-hcp',{type:'line',data:{labels,datasets:totalsSeries.map(s=>{
+      let acc=[]; const data=s.data.map(t=>{ if(t==null) return null; acc.push(t); return Math.round((mean(acc)-PAR_TOTAL)*10)/10; });
+      return {label:s.name,data,borderColor:s.color,backgroundColor:s.color,tension:.25,spanGaps:true,pointRadius:3,borderWidth:2.5};
+    })},
+    options:Object.assign({},base,{scales:{y:{title:{display:true,text:'Hándicap'}},x:{ticks:{maxRotation:60,autoSkip:true}}}})});
+
+  mk('c-hole',{type:'bar',data:{labels:Array.from({length:HOLES},(_,h)=>'Hoyo '+(h+1)),
+      datasets:list.map(s=>({label:s.name,data:s.holeAvg.map(a=>Math.round(a*100)/100),backgroundColor:s.color,borderRadius:3}))},
+    options:Object.assign({},base,{scales:{y:{beginAtZero:false,suggestedMin:2,title:{display:true,text:'Golpes de media'}}}})});
+
+  const wl=list.slice().sort((a,b)=>b.wins-a.wins);
+  mk('c-win',{type:'bar',data:{labels:wl.map(s=>s.name),datasets:[{label:'Victorias',data:wl.map(s=>s.wins),backgroundColor:wl.map(s=>s.color),borderRadius:4}]},
+    options:Object.assign({},base,{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}})});
+
+  const catDefs=[['Birdie','b',T.birdie],['Par','p',T.green],['Bogey','bo','#E0A526'],['Doble','d',T.flag],['6 o más','x','#7A2A22']];
+  mk('c-dist',{type:'bar',data:{labels:list.map(s=>s.name),datasets:catDefs.map(([n,k,c])=>({label:n,backgroundColor:c,
+      data:list.map(s=>{ const tot=sum(Object.values(s.cat)); return tot?Math.round(s.cat[k]/tot*1000)/10:0; })}))},
+    options:Object.assign({},base,{indexAxis:'y',scales:{x:{stacked:true,max:100,ticks:{callback:v=>v+'%'}},y:{stacked:true}}})});
+}
+
+/* ---------- Historial ---------- */
+function renderHist(){
+  const v=$('#v-hist');
+  if(!rounds.length){ v.innerHTML='<div class="card empty">Todavía no hay partidas guardadas.</div>'; return; }
+  v.innerHTML=rounds.slice().reverse().map(r=>{
+    const ents=r.entries.filter(complete);
+    const min=ents.length>1?Math.min(...ents.map(e=>sum(e.h))):null;
+    return `<div class="card">
+      <div class="round-head"><h3>Partida ${r.n}${r.date?' · '+fmtDate(r.date):''}</h3>
+        ${canWrite?`<div class="actions"><button type="button" class="ghost" data-act="edit" data-id="${esc(r.id)}">Editar</button><button type="button" class="ghost danger" data-act="del" data-id="${esc(r.id)}">Borrar</button></div>`:''}
+      </div>
+      <div class="scroll"><table>
+        <thead><tr><th>Jugador</th>${Array.from({length:HOLES},(_,h)=>`<th>${h+1}</th>`).join('')}<th>Total</th><th>+/−</th></tr></thead>
+        <tbody>${r.entries.map(e=>{
+          const t=sum(e.h), w=min!=null&&t===min;
+          return `<tr><td class="pname" style="--pc:${pc(e.p)}"><i></i>${esc(e.p)}${w?'<span class="win">Gana</span>':''}</td>
+            ${e.h.map(x=>`<td><span class="sc sm ${cls(x)}">${x}</span></td>`).join('')}
+            <td class="tot">${t}</td><td class="sp">${sgn(t-PAR_TOTAL)}</td></tr>`;
+        }).join('')}</tbody></table></div>
+    </div>`;
+  }).join('')+noteLegend();
+}
+function startEdit(id){
+  const r=rounds.find(x=>x.id===id); if(!r) return;
+  const names=knownPlayers();
+  draft={editId:r.id,n:r.n,date:r.date||'',hole:0,
+    players:names.map(p=>{ const e=r.entries.find(x=>x.p===p); return {name:p,on:!!e,h:e?e.h.slice():Array(HOLES).fill(null)}; })};
+  show('new');
+}
+const pendingDel={};
+async function delRound(btn,id){
+  if(!pendingDel[id]){
+    pendingDel[id]=true; btn.textContent='Confirmar borrado';
+    setTimeout(()=>{ pendingDel[id]=false; if(btn.isConnected) btn.textContent='Borrar'; },4000);
+    return;
+  }
+  try{ await store.remove(id); toast('Partida borrada'); }
+  catch(e){ if(!(e&&/clave/i.test(e.message||''))) toast('No se pudo borrar la partida.'); }
+}
+
+/* ---------- Eventos ---------- */
+document.addEventListener('click',e=>{
+  const tab=e.target.closest('#tabs button'); if(tab){ show(tab.dataset.v); return; }
+  const b=e.target.closest('[data-act]'); if(!b) return;
+  const act=b.dataset.act, i=+b.dataset.i;
+  if(act==='toggle'){ draft.players[i].on=!draft.players[i].on; saveDraft(); renderNew(); }
+  else if(act==='addp'){
+    const inp=$('#newp'), name=(inp.value||'').trim();
+    if(!name) return;
+    if(draft.players.some(p=>p.name.toLowerCase()===name.toLowerCase())){ toast('Ese jugador ya está en la lista'); return; }
+    extraPlayers.push(name);
+    draft.players.push({name,on:true,h:Array(HOLES).fill(null)});
+    saveDraft(); renderNew();
+  }
+  else if(act==='hole'){ draft.hole=+b.dataset.h; saveDraft(); refreshForm(); }
+  else if(act==='prevh'){ draft.hole=(draft.hole+HOLES-1)%HOLES; saveDraft(); refreshForm(); }
+  else if(act==='nexth'){ draft.hole=(draft.hole+1)%HOLES; saveDraft(); refreshForm(); }
+  else if(act==='inc'){ const c=draft.players[i].h[draft.hole]; setScore(i,draft.hole,c==null?PAR:Math.min(MAXS,c+1)); }
+  else if(act==='dec'){ const c=draft.players[i].h[draft.hole]; setScore(i,draft.hole,c==null?PAR:Math.max(1,c-1)); }
+  else if(act==='save'){ saveRound(); }
+  else if(act==='discard'){ draft=newDraft(); saveDraft(); renderNew(); }
+  else if(act==='edit'){ startEdit(b.dataset.id); }
+  else if(act==='del'){ delRound(b,b.dataset.id); }
+});
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.matches('input[data-i][data-h]')){
+    const raw=t.value.replace(/\D/g,'');
+    let val=raw===''?null:Math.min(MAXS,Math.max(1,parseInt(raw,10)));
+    if(raw!==''&&String(val)!==raw) t.value=String(val);
+    setScore(+t.dataset.i,+t.dataset.h,val);
+  }
+});
+document.addEventListener('change',e=>{
+  if(e.target.id==='f-date'){ draft.date=e.target.value; saveDraft(); }
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target.id==='newp'){ e.preventDefault(); const b=$('[data-act="addp"]'); if(b) b.click(); }
+});
+try{
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{ if(view==='evo') renderView(); });
+}catch(e){}
+
+/* ---------- Datos (Supabase) ---------- */
+function normalize(r){
+  const entries=Array.isArray(r.entries)?r.entries.filter(e=>e&&typeof e.p==='string'&&Array.isArray(e.h)):[];
+  return {id:String(r.id),n:Number(r.n)||0,date:r.date||'',entries};
+}
+function onData(list){
+  rounds=list.sort((a,b)=>a.n-b.n);
+  knownPlayers();
+  if(!draft){ draft=loadDraft()||newDraft(); }
+  if(!draft.editId&&!draft.players.length) draft=newDraft();
+  renderBanner();
+  if(view==='new'){ updateSub(); if(!formRendered) renderNew(); }
+  else renderView();
+}
+function banner(msg){ $('#banner').innerHTML='<div class="note">'+msg+'</div>'; }
+async function load(){
+  const {data,error}=await sb.from('rounds').select('id,n,date,entries').order('n',{ascending:true});
+  if(error){ banner('No se pudieron cargar las partidas: '+esc(error.message)); return false; }
+  onData(data.map(normalize));
+  return true;
+}
+function getCode(){
+  let c=''; try{ c=localStorage.getItem(CODE_KEY)||''; }catch(e){}
+  if(!c){
+    c=(window.prompt('Clave del grupo (te la ha dado quien montó la app):')||'').trim();
+    if(c){ try{ localStorage.setItem(CODE_KEY,c); }catch(e){} }
+  }
+  return c;
+}
+function badCode(err){
+  if(err&&/clave incorrecta/i.test(err.message||'')){
+    try{ localStorage.removeItem(CODE_KEY); }catch(e){}
+    toast('Clave del grupo incorrecta');
+    return true;
+  }
+  return false;
+}
+async function init(){
+  draft=loadDraft();
+  if(typeof supabase==='undefined'){ banner('No se pudo cargar la librería de Supabase. Comprueba tu conexión.'); return; }
+  if(/TU-PROYECTO/.test(SUPABASE_URL)){ banner('Falta configurar la app: edita SUPABASE_URL y SUPABASE_KEY al principio del archivo index.html.'); return; }
+  sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+  store={
+    async save(id,data){
+      const code=getCode(); if(!code) throw new Error('sin clave');
+      const {error}=await sb.rpc('save_round',{p_code:code,p_id:id?Number(id):null,p_n:data.n,p_date:data.date||null,p_entries:data.entries});
+      if(error){ badCode(error); throw error; }
+      await load();
+    },
+    async remove(id){
+      const code=getCode(); if(!code) throw new Error('sin clave');
+      const {error}=await sb.rpc('delete_round',{p_code:code,p_id:Number(id)});
+      if(error){ badCode(error); throw error; }
+      await load();
+    }
+  };
+  $('#v-new').innerHTML='<div class="card empty">Cargando…</div>';
+  await load();
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&view!=='new') load(); });
+}
+init();
+})();
+</script>
+</body>
+</html>
